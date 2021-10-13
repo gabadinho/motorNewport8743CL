@@ -1,0 +1,58 @@
+record(motor, "$(P)$(M)")
+{
+	field(RDBD, "$(RDBD)")
+    field(RTRY, "0")
+}
+
+record(ao, "$(P)$(M)_RDBD_CMD")
+{
+	field(DESC, "Motor record RDBD")
+	field(OMSL, "closed_loop")
+	field(DTYP, "asynFloat64")
+	field(DOL,  "$(P)$(M).RDBD CP MS")
+	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_RDBD")
+}
+
+record(ao, "$(P)$(M)_MRES_CMD")
+{
+    field(DESC, "Motor record MRES")
+    field(OMSL, "closed_loop")
+    field(DTYP, "asynFloat64")
+    field(DOL,  "$(P)$(M).MRES CP MS")
+    field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_MRES")
+}
+
+record(mbbo, "$(P)$(M)_HOMR_CMD")
+{
+	field(DESC, "HOMR type")
+    field(DTYP, "asynInt32")
+    field(VAL,  "$(HOMR)")
+    field(ZRST, "Disabled")
+    field(ONST, "Home")
+    field(TWST, "Index")
+    field(THST, "Limit")
+    field(PINI, "YES")
+	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_HOMR")
+}
+
+record(mbbo, "$(P)$(M)_HOMF_CMD")
+{
+	field(DESC, "HOMF type")
+    field(DTYP, "asynInt32")
+    field(VAL,  "$(HOMF)")
+    field(ONST, "Home")
+    field(TWST, "Index")
+    field(THST, "Limit")
+    field(PINI, "YES")
+	field(OUT,  "@asyn($(PORT),$(ADDR))MOTOR_HOMF")
+}
+
+record(bo, "$(P)$(M)_RST_CMD")
+{
+    field(DESC, "Reset controller")
+    field(DTYP, "asynInt32")
+    field(OUT,  "@asyn($(PORT),$(ADDR))CTRL_RESET")
+    field(ZNAM, "RESET")
+    field(ONAM, "RESET")
+}
+
