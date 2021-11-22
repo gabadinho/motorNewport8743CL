@@ -102,7 +102,13 @@ public:
 
     asynStatus poll(bool *moving);
 
-    // Static class methods
+    // Class-wide methods
+    static bool updateAxisReadbackPosition(asynStatus status, const char *reply, long& readback, asynStatus *asyn_error);
+    static bool updateAxisDeadband(asynStatus status, const char *reply, long& deadband, asynStatus *asyn_error);
+    static bool updateAxisMotionDone(asynStatus status, const char *reply, bool& motion_done, asynStatus *asyn_error);
+    static bool updateAxisClosedLoop(asynStatus status, const char *reply, bool& closed_loop, asynStatus *asyn_error);
+    static bool updateAxisMotorType(asynStatus status, const char *reply, newportMotorType& mot_type, asynStatus *asyn_error);
+
     static bool buildMoveAbsoluteCommand(char *buffer, int axis, double abs_pos, double velocity, long deadband);
     static bool buildMoveRelativeCommand(char *buffer, int axis, double rel_pos, double velocity, long deadband);
     static bool buildHomeCommand(char *buffer, int axis, int forwards, newportHomeType home_type);
@@ -111,6 +117,13 @@ public:
     static bool buildSetPositionCommand(char *buffer, int axis, double position, long current_readback);
     static bool buildCloseLoopCommand(char *buffer, int axis);
     static bool buildGenericGetCommand(char *buffer, const char *command_format, int axis);
+
+    static bool issigneddigit(const char *buffer) {
+        size_t buf_len = strlen(buffer);
+        if (buf_len == 1) return isdigit(*buffer);
+        if (buf_len > 1) return isdigit(*buffer) || (*buffer=='-' && isdigit(*++buffer));
+        return false;
+    }
 
 protected:
     // Specific class methods
@@ -159,6 +172,8 @@ public:
     asynStatus poll();
 
     // Static class methods
+    static bool updateControllerStatus(asynStatus status, const char *reply, int& ctrl_stat, asynStatus *asyn_error);
+
     static bool buildGenericGetCommand(char *buffer, const char *command_format);
 
 protected:

@@ -4,6 +4,6 @@
 -include $(TOP)/../../../RELEASE.$(EPICS_HOST_ARCH).local
 # Use motorNewport8743CL's release file when building inside motorNewport8743CL, but outside motor
 -include $(TOP)/../../configure/RELEASE.local
-# Use np8743clIOC's RELEASE.local when building outside motorNewport8743CL
+# Use gtestIOC's RELEASE.local when building outside motorNewport8743CL
 -include $(TOP)/configure/RELEASE.local
 

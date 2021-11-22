@@ -221,6 +221,20 @@ asynStatus Newport8743Controller::poll() {
     return final_status;
 }
 
+/** All the following methods parse a reply sent by the controller.
+  *
+  */
+bool Newport8743Controller::updateControllerStatus(asynStatus status, const char *reply, int& ctrl_stat, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (isdigit(*reply))) {
+        ctrl_stat = atoi(reply);
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
+}
+
 /** The following methods generate a command string to be sent to the controller.
   *
   */
@@ -693,6 +707,64 @@ newportMotorType Newport8743Axis::retrieveMotorType() {
     }
 
     return typ;
+}
+
+/** All the following methods parse a reply sent by the controller.
+  *
+  */
+bool Newport8743Axis::updateAxisReadbackPosition(asynStatus status, const char *reply, long& readback, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (issigneddigit(reply))) {
+        readback = atol(reply);
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
+}
+
+bool Newport8743Axis::updateAxisDeadband(asynStatus status, const char *reply, long& deadband, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (issigneddigit(reply))) {
+        deadband = atol(reply);
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
+}
+
+bool Newport8743Axis::updateAxisMotionDone(asynStatus status, const char *reply, bool& motion_done, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (strlen(reply)) && ((*reply>='0') && (*reply<='1'))) {
+        motion_done = atoi(reply);
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
+}
+
+bool Newport8743Axis::updateAxisClosedLoop(asynStatus status, const char *reply, bool& closed_loop, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (strlen(reply)) && ((*reply>='0') && (*reply<='1'))) {
+        closed_loop = atoi(reply);
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
+}
+
+bool Newport8743Axis::updateAxisMotorType(asynStatus status, const char *reply, newportMotorType& mot_type, asynStatus *asyn_error) {
+    bool res = false;
+    if ((status == asynSuccess) && (strlen(reply)==1) && ((*reply>='0') && (*reply<='3'))) {
+        mot_type = static_cast<newportMotorType>(atoi(reply));
+        res = true;
+    } else {
+        if (asyn_error) *asyn_error = asynError;
+    }
+    return res;
 }
 
 /** All the following methods generate a command string to be sent to the controller.

@@ -1,7 +1,7 @@
 TOP = ..
 include $(TOP)/configure/CONFIG
 
-DIRS += np8743clIOC
+DIRS += np8743clIOC gtestIOC
 
 include $(TOP)/configure/RULES_TOP
 
