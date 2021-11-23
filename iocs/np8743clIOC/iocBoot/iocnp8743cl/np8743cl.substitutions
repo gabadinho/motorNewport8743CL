@@ -1,0 +1,15 @@
+file "$(MOTOR)/db/basic_asyn_motor.db"
+{
+pattern
+{P,         M,        DTYP,         PORT,      ADDR,  DESC,            EGU,  DIR,  VELO,  VBAS,  ACCL,  BDST,  BVEL,  BACC,  MRES,     PREC,  DHLM,  DLLM,   INIT  }
+{NEWPORT:,  "MOT0",   "asynMotor",  NP8743CL,  0,     "Newport Mot0",  mm,   Pos,  5,     0,     0,     0,     1,     .2,    0.0001,   5,     20,    -20,    ""    }
+}
+
+#file "$(MOTOR_NMFLEXDC)/db/np8743cl_motor_extra.template"
+#{
+#pattern
+#{P,        M,       PORT,      ADDR,   RDBD,     HOMR,    HOMF}
+#{FLEXDC:,  "MOT0",  NMFLEXDC,  0,      0.001     1,       2   }
+#{FLEXDC:,  "MOT1",  NMFLEXDC,  1,      0.001,    1,       0   }
+#}
+

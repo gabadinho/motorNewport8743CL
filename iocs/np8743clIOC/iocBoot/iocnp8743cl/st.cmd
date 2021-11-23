@@ -1,18 +1,16 @@
 #!../../bin/linux-x86_64/np8743cl
 
-#- You may have to change np8743cl to something else
-#- everywhere it appears in this file
+< envPaths
 
-#< envPaths
+cd "${TOP}"
 
 ## Register all support components
-dbLoadDatabase("../../dbd/np8743cl.dbd",0,0)
-np8743cl_registerRecordDeviceDriver(pdbbase) 
+dbLoadDatabase "dbd/np8743cl.dbd"
+np8743cl_registerRecordDeviceDriver pdbbase
 
-## Load record instances
-dbLoadRecords("../../db/np8743cl.db","user=gabadinho")
+cd "${TOP}/iocBoot/${IOC}"
 
-iocInit()
+##
+< np8743cl.cmd
 
-## Start any sequence programs
-#seq sncnp8743cl,"user=gabadinho"
+iocInit

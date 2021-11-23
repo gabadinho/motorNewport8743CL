@@ -192,7 +192,7 @@ Newport8743Axis* Newport8743Controller::getAxis(int axisNo) {
 asynStatus Newport8743Controller::poll() {
     asynStatus status = asynError, final_status = asynSuccess;
     int all_switches = 0x1B; // Simulate activation of both limits switches on both axes
-    int error_code = 0; // No error
+    //int error_code = 0; // No error
     Newport8743Axis *axis;
 
     buildGenericGetCommand(this->outString_, CTRL_STATUS_CMD);
@@ -242,7 +242,7 @@ bool Newport8743Controller::buildGenericGetCommand(char *buffer, const char *com
     if ((!buffer) || (!command_format)) {
         return false;
     }
-    sprintf(buffer, command_format);
+    sprintf(buffer, "%s", command_format);
     return true;
 }
 

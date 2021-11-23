@@ -16,10 +16,23 @@ DBD += np8743cl.dbd
 np8743cl_DBD += base.dbd
 
 # Include dbd files from all support applications:
-#np8743cl_DBD += xxx.dbd
+#ifdef ASYN
+np8743cl_DBD += asyn.dbd
+np8743cl_DBD += drvAsynSerialPort.dbd
+np8743cl_DBD += drvAsynIPPort.dbd
+#endif
+np8743cl_DBD += motorSupport.dbd
+np8743cl_DBD += newport8743.dbd
 
 # Add all the support libraries needed by this IOC
-#np8743cl_LIBS += xxx
+np8743cl_LIBS += newport8743
+np8743cl_LIBS += motor
+#ifdef ASYN
+np8743cl_LIBS += asyn
+#endif
+#ifdef SNCSEQ
+np8743cl_LIBS += seq pv
+#endif
 
 # np8743cl_registerRecordDeviceDriver.cpp derives from np8743cl.dbd
 np8743cl_SRCS += np8743cl_registerRecordDeviceDriver.cpp
