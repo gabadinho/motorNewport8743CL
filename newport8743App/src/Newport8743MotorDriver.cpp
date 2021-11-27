@@ -192,29 +192,26 @@ Newport8743Axis* Newport8743Controller::getAxis(int axisNo) {
 asynStatus Newport8743Controller::poll() {
     asynStatus status = asynError, final_status = asynSuccess;
     int all_switches = 0x1B; // Simulate activation of both limits switches on both axes
-    //int error_code = 0; // No error
     Newport8743Axis *axis;
 
     buildGenericGetCommand(this->outString_, CTRL_STATUS_CMD);
     status = writeReadController();
     if (status == asynSuccess) {
-        all_switches = atoi(inString_);
-    } else if (status == asynTimeout) {
-        return gotDisconnected(); // Beware: return in the middle of the function's code
-    } else {
-        final_status = asynError;
-    }
-
-    if (this->disconnectedFlag) {
-        gotConnected();
-    }
-
-    if (final_status == asynSuccess) {
-        for (int i=0; i<numAxes_; i++) {
-            axis = getAxis(i);
-            if (axis) {
-                axis->updateAxisStatus(all_switches >> (i*3));
+        if (updateControllerStatus(status, this->inString_, all_switches, &final_status)) {
+            if (this->disconnectedFlag) {
+                gotConnected();
             }
+            for (int i=0; i<numAxes_; i++) {
+                axis = getAxis(i);
+                if (axis) {
+                    axis->updateAxisStatus(all_switches >> (i*3));
+                }
+            }
+        }
+    } else {
+        final_status = status;
+        if (!this->disconnectedFlag) {
+            final_status = gotDisconnected();
         }
     }
 
@@ -533,8 +530,8 @@ asynStatus Newport8743Axis::setPosition(double position) {
   */
 asynStatus Newport8743Axis::poll(bool *moving) { 
     asynStatus status = asynError, final_status = asynSuccess;
-    int at_limit, motion_done=0, homing;
-    bool valid_motion_done = false, valid_readback = false;
+    int at_limit, homing;
+    bool motion_done, valid_motion_done = false, valid_readback = false;
     long readback;
 
     if (this->disconnectedFlag) {
@@ -544,27 +541,19 @@ asynStatus Newport8743Axis::poll(bool *moving) {
         return asynError;
     }
 
-    buildGenericGetCommand(pC_->outString_, AXIS_MOTIONDONE_CMD, this->axisNo_);
-    status = pC_->writeReadController();
-    if (status == asynSuccess) {
-        valid_motion_done = true;
-        motion_done = atoi(pC_->inString_);
-    } else if (status == asynTimeout) {
-        return status; // Beware: return in the middle of the function's code
-    } else {
-        final_status = asynError;
-    }
-
     buildGenericGetCommand(pC_->outString_, AXIS_READBACKPOS_CMD, this->axisNo_);
     status = pC_->writeReadController();
-    if (status == asynSuccess) {
-        valid_readback = true;
-        readback = atol(pC_->inString_);
-    } else if (status == asynTimeout) {
+    if (status != asynSuccess) {
         return status; // Beware: return in the middle of the function's code
-    } else {
-        final_status = asynError;
     }
+    valid_readback = updateAxisReadbackPosition(status, pC_->inString_, readback, &final_status);
+
+    buildGenericGetCommand(pC_->outString_, AXIS_MOTIONDONE_CMD, this->axisNo_);
+    status = pC_->writeReadController();
+    if (status != asynSuccess) {
+        return status; // Beware: return in the middle of the function's code
+    }
+    valid_motion_done = updateAxisMotionDone(status, pC_->inString_, motion_done, &final_status);
 
     if (valid_readback) {
         setDoubleParam(pC_->motorEncoderPosition_, readback);
@@ -665,9 +654,7 @@ bool Newport8743Axis::isClosedLoop() {
     if ((this->motorType == TINY_MOTOR) || (this->motorType == STANDARD_MOTOR)) {
         buildGenericGetCommand(pC_->outString_, AXIS_GETCLOSEDLOOP_CMD, this->axisNo_);
         status = pC_->writeReadController();
-        if (status == asynSuccess) {
-            closed = atoi(pC_->inString_);
-        } else {
+        if (!updateAxisClosedLoop(status, pC_->inString_, closed, NULL)) {
             asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Error retrieving closed-loop status of Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
         }
     }
@@ -683,12 +670,12 @@ long Newport8743Axis::getDeadband() {
     asynStatus status = asynError;
     long deadband = -1;
 
-    buildGenericGetCommand(pC_->outString_, AXIS_GETDEADBAND_CMD, this->axisNo_);
-    status = pC_->writeReadController();
-    if (status == asynSuccess) {
-        deadband = atol(pC_->inString_);
-    } else {
-        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Error retrieving current deadband of Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
+    if ((this->motorType == TINY_MOTOR) || (this->motorType == STANDARD_MOTOR)) {
+        buildGenericGetCommand(pC_->outString_, AXIS_GETDEADBAND_CMD, this->axisNo_);
+        status = pC_->writeReadController();
+        if (!updateAxisDeadband(status, pC_->inString_, deadband, NULL)) {
+            asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Error retrieving current deadband of Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
+        }
     }
 
     return deadband;
@@ -699,12 +686,12 @@ long Newport8743Axis::getDeadband() {
   * \return -1 for communication error, 0 no motor, 1 unknown type, 2 tiny motor, 3 standard motor
   */
 newportMotorType Newport8743Axis::retrieveMotorType() {
+    asynStatus status = asynError;
     newportMotorType typ = COMM_FAILURE;
 
     buildGenericGetCommand(pC_->outString_, AXIS_MOTORTYPE_CMD, this->axisNo_);
-    if (pC_->writeReadController() == asynSuccess) {
-        typ = static_cast<newportMotorType>(atoi(pC_->inString_));
-    }
+    status = pC_->writeReadController();
+    updateAxisMotorType(status, pC_->inString_, typ, NULL);
 
     return typ;
 }
@@ -841,7 +828,8 @@ bool Newport8743Axis::buildGenericGetCommand(char *buffer, const char *command_f
   * doesn't abort any ongoing motion!
   */
 void Newport8743Axis::gotConnected() {
-    int motion_done=0;
+    bool motion_done;
+    asynStatus status = asynError;
     newportMotorType motor_type = retrieveMotorType();
 
     if ((motor_type == TINY_MOTOR) || (motor_type == STANDARD_MOTOR)) {
@@ -850,8 +838,8 @@ void Newport8743Axis::gotConnected() {
             setIntegerParam(pC_->motorStatusHasEncoder_, 1);
 
             buildGenericGetCommand(pC_->outString_, AXIS_MOTIONDONE_CMD, this->axisNo_);
-            if (pC_->writeReadController() == asynSuccess) {
-                motion_done = atoi(pC_->inString_);
+            status = pC_->writeReadController();
+            if (updateAxisMotionDone(status, pC_->inString_, motion_done, NULL)) {
                 if (motion_done) {
                     buildCloseLoopCommand(pC_->outString_, this->axisNo_);
                     if (pC_->writeController() == asynSuccess) {
