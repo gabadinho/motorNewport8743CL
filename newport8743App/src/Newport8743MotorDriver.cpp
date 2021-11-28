@@ -9,6 +9,7 @@ September 2021
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 
 #include "Newport8743MotorDriver.h"
 
@@ -23,6 +24,15 @@ September 2021
 
 #define RECONNECT_SLEEP 0.1
 #define SHORTWAIT_SLEEP 0.1
+
+
+
+const char* HOME_COMMAND[] = {
+    "",
+    "%dOR",
+    "%dMZ%c",
+    "%dMT%c"
+};
 
 
 
@@ -61,21 +71,21 @@ Newport8743Controller::Newport8743Controller(const char *portName, const char *a
     numAxes = 2; // Force two-axes regardless of what user says
 
     // Connect to Newport 8743-CL controller
-    asynPrint(this->pasynUserSelf, ASYN_TRACE_FLOW, "%s:%s: Creating Newport 8743-CL controller %s to asyn %s with %d axes\n", driverName, functionName, portName, asynPortName, numAxes);
+    log(ASYN_TRACE_FLOW, "%s:%s: Creating Newport 8743-CL controller %s to asyn %s with %d axes\n", driverName, functionName, portName, asynPortName, numAxes);
     status = pasynOctetSyncIO->connect(asynPortName, 0, &pasynUserController_, NULL);
     if (status) {
-        asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "%s:%s: Cannot connect to Newport 8743-CL controller at asyn %s\n", driverName, functionName, asynPortName);
+        log(ASYN_TRACE_ERROR, "%s:%s: Cannot connect to Newport 8743-CL controller at asyn %s\n", driverName, functionName, asynPortName);
     }
 
     pasynOctetSyncIO->getInputEos(pasynUserController_, eos, 10, &eos_len);
     if (!eos_len) {
-            asynPrint(this->pasynUserSelf, ASYN_TRACE_FLOW, "%s:%s: Setting input acknowledgement of %s to CR LF\n", driverName, functionName, portName);
+        log(ASYN_TRACE_FLOW, "%s:%s: Setting input acknowledgement of %s to CR LF\n", driverName, functionName, portName);
         pasynOctetSyncIO->setInputEos(pasynUserController_, "\r\n", 2);
     }
 
     pasynOctetSyncIO->getOutputEos(pasynUserController_, eos, 10, &eos_len);
     if (!eos_len) {
-        asynPrint(this->pasynUserSelf, ASYN_TRACE_FLOW, "%s:%s: Setting output acknowledgement of %s to CR LF\n", driverName, functionName, portName);
+        log(ASYN_TRACE_FLOW, "%s:%s: Setting output acknowledgement of %s to CR LF\n", driverName, functionName, portName);
         pasynOctetSyncIO->setOutputEos(pasynUserController_, "\r\n", 2);
     }
 
@@ -121,7 +131,7 @@ asynStatus Newport8743Controller::writeInt32(asynUser *pasynUser, epicsInt32 val
             status = asynMotorController::writeInt32(pasynUser, value);
         }
     } else {
-        asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Unable to retrieve Newport 8743-CL %s axis from asynUser in %s\n", this->portName, functionName);
+        log(ASYN_TRACE_ERROR, "Unable to retrieve Newport 8743-CL %s axis from asynUser in %s\n", this->portName, functionName);
         status = asynError;
     }
 
@@ -145,7 +155,7 @@ void Newport8743Controller::report(FILE *fp, int level) {
         if (status == asynSuccess) {
             fprintf(fp, "  id = %s\n", this->inString_);
         } else {
-            asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Unable to retrieve Newport 8743-CL %s controller version!\n", this->portName);
+            log(ASYN_TRACE_ERROR, "Unable to retrieve Newport 8743-CL %s controller version!\n", this->portName);
             fprintf(fp, "  id = <unknown>\n");
         }
 
@@ -155,7 +165,7 @@ void Newport8743Controller::report(FILE *fp, int level) {
         if (status == asynSuccess) {
             fprintf(fp, "  msg = %s\n", this->inString_);
         } else {
-            asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Unable to retrieve Newport 8743-CL %s queued message!\n", this->portName);
+            log(ASYN_TRACE_ERROR, "Unable to retrieve Newport 8743-CL %s queued message!\n", this->portName);
             fprintf(fp, "  msg = <unknown>\n");
         }
     }
@@ -250,7 +260,7 @@ bool Newport8743Controller::buildGenericGetCommand(char *buffer, const char *com
 void Newport8743Controller::gotConnected() {
     Newport8743Axis *axis;
 
-    asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Successful poll() for Newport 8743-CL %s controller\n", this->portName);
+    log(ASYN_TRACE_ERROR, "Successful poll() for Newport 8743-CL %s controller\n", this->portName);
     this->disconnectedFlag = false;
 
     for (int i=0; i<numAxes_; i++) {
@@ -267,7 +277,7 @@ void Newport8743Controller::gotConnected() {
 asynStatus Newport8743Controller::gotDisconnected() {
     Newport8743Axis *axis;
 
-    asynPrint(this->pasynUserSelf, ASYN_TRACE_ERROR, "Got a timeout in Newport 8743-CL %s controller, attempting to reconnect...\n", this->portName);
+    log(ASYN_TRACE_ERROR, "Got a timeout in Newport 8743-CL %s controller, attempting to reconnect...\n", this->portName);
     this->disconnectedFlag = true;
 
     for (int i=0; i<numAxes_; i++) {
@@ -282,6 +292,18 @@ asynStatus Newport8743Controller::gotDisconnected() {
     connect(this->pasynUserController_);
 
     return asynTimeout;
+}
+
+/** Provide a class method to be used instead of asynPrint().
+  * Beware: can be called from constructor!
+  */
+void Newport8743Controller::log(int reason, const char *format, ...) {
+    if (this->pasynUserSelf) {
+        va_list arglist;
+        va_start(arglist, format);
+        pasynTrace->vprint(this->pasynUserSelf, reason, format, arglist);
+        va_end(arglist);
+    }
 }
 
 
@@ -372,11 +394,11 @@ asynStatus Newport8743Axis::move(double position, int relative, double minVeloci
     double rdbd, mres;
 
     if (this->disconnectedFlag) {
-        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Newport 8743-CL %s axis %d is disconnected\n", pC_->portName, this->axisNo_);
+        log(ASYN_TRACE_ERROR, "Newport 8743-CL %s axis %d is disconnected\n", pC_->portName, this->axisNo_);
         return asynTimeout;
     }
     if ((this->motorType != TINY_MOTOR) && (this->motorType != STANDARD_MOTOR)) {
-        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Unsupported Newport 8743-CL %s axis %d type %d (must be tiny or standard)\n", pC_->portName, this->axisNo_, this->motorType);
+        log(ASYN_TRACE_ERROR, "Unsupported Newport 8743-CL %s axis %d type %d (must be tiny or standard)\n", pC_->portName, this->axisNo_, this->motorType);
         return asynError;
     }
 
@@ -387,21 +409,21 @@ asynStatus Newport8743Axis::move(double position, int relative, double minVeloci
 
     if ((this->motorType == TINY_MOTOR) && (speed > TINY_MAX_VEL)) {
         speed = TINY_MAX_VEL;
-        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Lowering velocity to %ld on Newport 8743-CL %s axis %d\n", speed, pC_->portName, this->axisNo_);
+        log(ASYN_TRACE_FLOW, "Lowering velocity to %ld on Newport 8743-CL %s axis %d\n", speed, pC_->portName, this->axisNo_);
     }
 
     if (status == asynSuccess) {
-        pC_->getDoubleParam(this->axisNo_, pC_->driverRetryDeadband, &rdbd);
-        pC_->getDoubleParam(this->axisNo_, pC_->driverMotorRecResolution, &mres);
+        getDoubleParam(pC_->driverRetryDeadband, &rdbd);
+        getDoubleParam(pC_->driverMotorRecResolution, &mres);
         allowed_error = (long)(rdbd/mres);
 
         setIntegerParam(pC_->motorStatusDone_, 0);
         if (relative) {
-            asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Moving Newport 8743-CL %s axis %d to relative %ld at velocity %ld deadband %ld\n", pC_->portName, this->axisNo_, target, speed, allowed_error);
+            log(ASYN_TRACE_FLOW, "Moving Newport 8743-CL %s axis %d to relative %ld at velocity %ld deadband %ld\n", pC_->portName, this->axisNo_, target, speed, allowed_error);
             buildMoveRelativeCommand(pC_->outString_, this->axisNo_, target, speed, allowed_error);
             status = pC_->writeController();
         } else {
-            asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Moving Newport 8743-CL %s axis %d to %ld at velocity %ld deadband %ld\n", pC_->portName, this->axisNo_, target, speed, allowed_error);
+            log(ASYN_TRACE_FLOW, "Moving Newport 8743-CL %s axis %d to %ld at velocity %ld deadband %ld\n", pC_->portName, this->axisNo_, target, speed, allowed_error);
             buildMoveAbsoluteCommand(pC_->outString_, this->axisNo_, target, speed, allowed_error);
             status = pC_->writeController();
         }
@@ -433,11 +455,11 @@ asynStatus Newport8743Axis::home(double minVelocity, double maxVelocity, double 
     int hom_type;
 
     if (this->disconnectedFlag) {
-        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Newport 8743-CL %s axis %d is disconnected\n", pC_->portName, this->axisNo_);
+        log(ASYN_TRACE_ERROR, "Newport 8743-CL %s axis %d is disconnected\n", pC_->portName, this->axisNo_);
         return asynTimeout;
     }
     if ((this->motorType != TINY_MOTOR) && (this->motorType != STANDARD_MOTOR)) {
-        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Unsupported Newport 8743-CL %s axis %d type %d (must be tiny or standard)\n", pC_->portName, this->axisNo_, this->motorType);
+        log(ASYN_TRACE_ERROR, "Unsupported Newport 8743-CL %s axis %d type %d (must be tiny or standard)\n", pC_->portName, this->axisNo_, this->motorType);
         return asynError;
     }
 
@@ -448,16 +470,16 @@ asynStatus Newport8743Axis::home(double minVelocity, double maxVelocity, double 
 
     if (status == asynSuccess) {
         if (forwards) {
-            pC_->getIntegerParam(this->axisNo_, pC_->driverHomeForwardType, &hom_type);
+            getIntegerParam(pC_->driverHomeForwardType, &hom_type);
         } else {
-            pC_->getIntegerParam(this->axisNo_, pC_->driverHomeReverseType, &hom_type);
+            getIntegerParam(pC_->driverHomeReverseType, &hom_type);
         }
 
         if (hom_type > DISABLE) {
             setIntegerParam(pC_->motorStatusHome_, 1);
             setIntegerParam(pC_->motorStatusHomed_, 0);
 
-            asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Homing Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
+            log(ASYN_TRACE_FLOW, "Homing Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
             buildHomeCommand(pC_->outString_, this->axisNo_, forwards, static_cast<newportHomeType>(hom_type));
             status = pC_->writeController();
             if (status != asynSuccess) {
@@ -465,9 +487,9 @@ asynStatus Newport8743Axis::home(double minVelocity, double maxVelocity, double 
             }
         } else {
             if (forwards) {
-                asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Forward-homing of Newport 8743-CL %s axis %d is disabled!\n", pC_->portName, this->axisNo_);
+                log(ASYN_TRACE_ERROR, "Forward-homing of Newport 8743-CL %s axis %d is disabled!\n", pC_->portName, this->axisNo_);
             } else {
-                asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Reverse-homing of Newport 8743-CL %s axis %d is disabled!\n", pC_->portName, this->axisNo_);
+                log(ASYN_TRACE_ERROR, "Reverse-homing of Newport 8743-CL %s axis %d is disabled!\n", pC_->portName, this->axisNo_);
             }
             status = asynError;
         }
@@ -505,13 +527,13 @@ asynStatus Newport8743Axis::setPosition(double position) {
 
     if ((this->motorType == TINY_MOTOR) || (this->motorType == STANDARD_MOTOR)) {
         if (!this->motionDone) {
-            asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Due to ongoing motion of Newport 8743-CL %s axis %d, readback position will not be overriden!\n", pC_->portName, this->axisNo_);
+            log(ASYN_TRACE_ERROR, "Due to ongoing motion of Newport 8743-CL %s axis %d, readback position will not be overriden!\n", pC_->portName, this->axisNo_);
         } else {
-            buildSetPositionCommand(pC_->outString_, this->axisNo_, position, this->positionReadback);
+            buildSetPositionCommand(pC_->outString_, this->axisNo_, position);
             status = pC_->writeController();
         }
     } else {
-        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Unsupported Newport 8743-CL %s axis %d type %d (must be tiny or standard)\n", pC_->portName, this->axisNo_, this->motorType);
+        log(ASYN_TRACE_ERROR, "Unsupported Newport 8743-CL %s axis %d type %d (must be tiny or standard)\n", pC_->portName, this->axisNo_, this->motorType);
     }
 
     setStatusProblem(status);
@@ -562,7 +584,7 @@ asynStatus Newport8743Axis::poll(bool *moving) {
 
     if (valid_motion_done) {
         if (motion_done) {
-            pC_->getIntegerParam(this->axisNo_, pC_->motorStatusHome_, &homing);
+            getIntegerParam(pC_->motorStatusHome_, &homing);
             if (homing) {
                 setIntegerParam(pC_->motorStatusHome_, 0);
                 buildZeroCommand(pC_->outString_, this->axisNo_);
@@ -570,20 +592,20 @@ asynStatus Newport8743Axis::poll(bool *moving) {
                 if (status == asynSuccess) {
                     this->setIntegerParam(pC_->motorStatusHomed_, 1);
                 } else {
-                    asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Unable to set readback to 0 after homing Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
+                    log(ASYN_TRACE_ERROR, "Unable to set readback to 0 after homing Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
                     final_status = asynError;
                 }
             }
         }
 
-        pC_->getIntegerParam(this->axisNo_, pC_->motorStatusLowLimit_, &at_limit);
+        getIntegerParam(pC_->motorStatusLowLimit_, &at_limit);
         if ((motion_done) && (this->axisStatus&AXIS_NEG_LS) && (!at_limit)) {
             setIntegerParam(pC_->motorStatusLowLimit_, 1);
         } else if ((motion_done) && !(this->axisStatus&AXIS_NEG_LS) && (at_limit)) {
             setIntegerParam(pC_->motorStatusLowLimit_, 0);
         }
 
-        pC_->getIntegerParam(this->axisNo_, pC_->motorStatusHighLimit_, &at_limit);
+        getIntegerParam(pC_->motorStatusHighLimit_, &at_limit);
         if ((motion_done) && (this->axisStatus&AXIS_POS_LS) && (!at_limit)) {
             setIntegerParam(pC_->motorStatusHighLimit_, 1);
         } else if ((motion_done) && !(this->axisStatus&AXIS_POS_LS) && (at_limit)) {
@@ -606,7 +628,7 @@ asynStatus Newport8743Axis::poll(bool *moving) {
 void Newport8743Axis::setStatusProblem(asynStatus status) {
     int status_problem;
 
-    pC_->getIntegerParam(this->axisNo_, pC_->motorStatus_, &status_problem);
+    getIntegerParam(pC_->motorStatus_, &status_problem);
     if ((status != asynSuccess) && (!status_problem)) {
         setIntegerParam(pC_->motorStatusProblem_, 1);
     }
@@ -631,7 +653,7 @@ void Newport8743Axis::updateAxisStatus(int axis_status) {
   * \return Result of writeController() call
   */
 asynStatus Newport8743Axis::stopMotor() {
-    asynPrint(pC_->pasynUserSelf, ASYN_TRACE_FLOW, "Stopping motion on Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
+    log(ASYN_TRACE_FLOW, "Stopping motion on Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
     buildStopCommand(pC_->outString_, this->axisNo_);
     return pC_->writeController();
 }
@@ -655,7 +677,7 @@ bool Newport8743Axis::isClosedLoop() {
         buildGenericGetCommand(pC_->outString_, AXIS_GETCLOSEDLOOP_CMD, this->axisNo_);
         status = pC_->writeReadController();
         if (!updateAxisClosedLoop(status, pC_->inString_, closed, NULL)) {
-            asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Error retrieving closed-loop status of Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
+            log(ASYN_TRACE_ERROR, "Error retrieving closed-loop status of Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
         }
     }
 
@@ -674,7 +696,7 @@ long Newport8743Axis::getDeadband() {
         buildGenericGetCommand(pC_->outString_, AXIS_GETDEADBAND_CMD, this->axisNo_);
         status = pC_->writeReadController();
         if (!updateAxisDeadband(status, pC_->inString_, deadband, NULL)) {
-            asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Error retrieving current deadband of Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
+            log(ASYN_TRACE_ERROR, "Error retrieving current deadband of Newport 8743-CL %s axis %d\n", pC_->portName, this->axisNo_);
         }
     }
 
@@ -694,6 +716,29 @@ newportMotorType Newport8743Axis::retrieveMotorType() {
     updateAxisMotorType(status, pC_->inString_, typ, NULL);
 
     return typ;
+}
+
+/** Shortcuts to asynMotorController functions.
+  *
+  */
+asynStatus Newport8743Axis::getIntegerParam(int index, epicsInt32 *value) {
+    return this->pC_->getIntegerParam(this->axisNo_, index, value);
+}
+
+asynStatus Newport8743Axis::getDoubleParam(int index, double *value) {
+    return this->pC_->getDoubleParam(this->axisNo_, index, value);
+}
+
+/** Provide a class method to be used instead of asynPrint().
+  * Beware: can be called from constructor!
+  */
+void Newport8743Axis::log(int reason, const char *format, ...) {
+    if (this->pC_) {
+        va_list arglist;
+        va_start(arglist, format);
+        pasynTrace->vprint(pC_->pasynUserSelf, reason, format, arglist);
+        va_end(arglist);
+    }
 }
 
 /** All the following methods parse a reply sent by the controller.
@@ -774,10 +819,14 @@ bool Newport8743Axis::buildMoveRelativeCommand(char *buffer, int axis, double re
 }
 
 bool Newport8743Axis::buildHomeCommand(char *buffer, int axis, int forwards, newportHomeType home_type) {
-    if ((!buffer) || (axis<0) || (axis>1)) {
+    if ((!buffer) || (axis<0) || (axis>1) || (home_type==DISABLE)) {
         return false;
     }
-    sprintf(buffer, HOME_COMMAND[home_type], axis+1, HOMING_DIR[forwards]);
+    if (home_type == FIND_HOME) {
+        sprintf(buffer, HOME_COMMAND[FIND_HOME], axis+1);
+    } else {
+        sprintf(buffer, HOME_COMMAND[home_type], axis+1, HOMING_DIR[forwards]);
+    }
     return true;
 }
 
@@ -797,7 +846,7 @@ bool Newport8743Axis::buildZeroCommand(char *buffer, int axis) {
     return true;
 }
 
-bool Newport8743Axis::buildSetPositionCommand(char *buffer, int axis, double position, long current_readback) {
+bool Newport8743Axis::buildSetPositionCommand(char *buffer, int axis, double position) {
     if ((!buffer) || (axis<0) || (axis>1)) {
         return false;
     }
@@ -852,7 +901,7 @@ void Newport8743Axis::gotConnected() {
         this->motorType = motor_type;
         setStatusProblem(asynSuccess);
     } else {
-        asynPrint(pC_->pasynUserSelf, ASYN_TRACE_ERROR, "Unsupported Newport 8743-CL %s axis %d type %d (must be tiny or standard)\n", pC_->portName, this->axisNo_, this->motorType);
+        log(ASYN_TRACE_ERROR, "Unsupported Newport 8743-CL %s axis %d type %d (must be tiny or standard)\n", pC_->portName, this->axisNo_, this->motorType);
         setStatusProblem(asynError);
     }
 }

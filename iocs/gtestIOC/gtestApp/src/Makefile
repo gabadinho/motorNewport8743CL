@@ -29,7 +29,7 @@ gtest_LIBS += newport8743
 # gtest_registerRecordDeviceDriver.cpp derives from gtest.dbd
 gtest_SRCS += gtest_registerRecordDeviceDriver.cpp
 
-gtest_SRCS += gtestRegistrar.cpp gtestSuite1.cpp
+gtest_SRCS += gtestRegistrar.cpp gtestSuite1.cpp gtestSuite2.cpp
 
 # Build the main IOC entry point on workstation OSs.
 gtest_SRCS_DEFAULT += gtestMain.cpp

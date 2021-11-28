@@ -78,12 +78,6 @@ enum newportHomeType {
     FIND_INDEX,
     FIND_LIMIT
 };
-const char* HOME_COMMAND[] = {
-    "",
-    "%dOR",
-    "%dMZ%c",
-    "%dMT%c"
-};
 
 
 
@@ -114,7 +108,7 @@ public:
     static bool buildHomeCommand(char *buffer, int axis, int forwards, newportHomeType home_type);
     static bool buildStopCommand(char *buffer, int axis);
     static bool buildZeroCommand(char *buffer, int axis);
-    static bool buildSetPositionCommand(char *buffer, int axis, double position, long current_readback);
+    static bool buildSetPositionCommand(char *buffer, int axis, double position);
     static bool buildCloseLoopCommand(char *buffer, int axis);
     static bool buildGenericGetCommand(char *buffer, const char *command_format, int axis);
 
@@ -127,25 +121,30 @@ public:
 
 protected:
     // Specific class methods
-    void setStatusProblem(asynStatus status);
-    void updateAxisStatus(int axis_status);
+    virtual void setStatusProblem(asynStatus status);
+    virtual void updateAxisStatus(int axis_status);
 
-    asynStatus stopMotor();
+    virtual asynStatus stopMotor();
 
-    void shortWait();
+    virtual void shortWait();
 
-    bool isClosedLoop();
+    virtual bool isClosedLoop();
 
-    long getDeadband();
+    virtual long getDeadband();
 
-    newportMotorType retrieveMotorType();
+    virtual newportMotorType retrieveMotorType();
 
-    void gotConnected();
-    void gotDisconnected();
+    virtual void gotConnected();
+    virtual void gotDisconnected();
 
-private:
+    virtual asynStatus getIntegerParam(int index, epicsInt32 *value);
+    virtual asynStatus getDoubleParam(int index, double *value);
+
+    virtual void log(int reason, const char *format, ...);
+
     Newport8743Controller *pC_; // Pointer to the asynMotorController to which this axis belongs
 
+private:
     bool motionDone;
     int axisStatus;
     long positionReadback;
@@ -178,8 +177,10 @@ public:
 
 protected:
     // Specific class methods
-    void gotConnected();
-    asynStatus gotDisconnected();
+    virtual void gotConnected();
+    virtual asynStatus gotDisconnected();
+
+    virtual void log(int reason, const char *format, ...);
 
     int driverRetryDeadband;
     int driverMotorRecResolution;
