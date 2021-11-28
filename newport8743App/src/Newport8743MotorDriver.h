@@ -144,11 +144,12 @@ protected:
 
     Newport8743Controller *pC_; // Pointer to the asynMotorController to which this axis belongs
 
+    newportMotorType motorType;
+
 private:
     bool motionDone;
     int axisStatus;
     long positionReadback;
-    newportMotorType motorType;
 
     bool disconnectedFlag;
 

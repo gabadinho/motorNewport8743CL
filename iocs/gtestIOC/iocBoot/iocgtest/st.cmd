@@ -3,7 +3,7 @@
 #- You may have to change gtest to something else
 #- everywhere it appears in this file
 
-#< envPaths
+< envPaths
 
 ## Register all support components
 dbLoadDatabase("../../dbd/gtest.dbd",0,0)
